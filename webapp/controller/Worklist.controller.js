@@ -3,8 +3,10 @@ sap.ui.define([
     "sap/ui/model/json/JSONModel",
     "mycompany/myapp/MyWorklistApp/model/formatter",
     "sap/ui/model/Filter",
-    "sap/ui/model/FilterOperator"
-], function (BaseController, JSONModel, formatter, Filter, FilterOperator) {
+    "sap/ui/model/FilterOperator",
+    "sap/m/MessageToast",
+	"sap/m/MessageBox"
+], function (BaseController, JSONModel, formatter, Filter, FilterOperator, MessageToast, MessageBox) {
     "use strict";
 
     return BaseController.extend("mycompany.myapp.MyWorklistApp.controller.Worklist", {
@@ -189,7 +191,66 @@ sap.ui.define([
                   sKey   = oEvent.getParameter("selectedKey");
                   oBinding.filter(this._mFilters[sKey]);
 
-        }
+        },
+		_showErrorMessage: function(sMsg) {
+			MessageBox.error(sMsg, {
+				styleClass: this.getOwnerComponent().getContentDensityClass()
+			});
+		},
+
+        _handleUnlistActionResult : function (sProductId, bSuccess, iRequestNumber, iTotalRequests){
+			// we could create a counter for successful and one for failed requests
+			// however, we just assume that every single request was successful and display a success message once
+			if (iRequestNumber === iTotalRequests) {
+				MessageToast.show(this.getModel("i18n").getResourceBundle().getText("StockRemovedSuccessMsg", [iTotalRequests]));
+			}
+		},
+
+		_handleReorderActionResult : function (sProductId, bSuccess, iRequestNumber, iTotalRequests){
+			// we could create a counter for successful and one for failed requests
+			// however, we just assume that every single request was successful and display a success message once
+			if (iRequestNumber === iTotalRequests) {
+				MessageToast.show(this.getModel("i18n").getResourceBundle().getText("StockUpdatedSuccessMsg", [iTotalRequests]));
+			}
+		},    
+        
+		onUnlistObjects: function() {
+			var aSelectedProducts, i, sPath, oProduct, oProductId;
+
+			aSelectedProducts = this.byId("table").getSelectedItems();
+			if (aSelectedProducts.length) {
+				for (i = 0; i < aSelectedProducts.length; i++) {
+					oProduct = aSelectedProducts[i];
+					oProductId = oProduct.getBindingContext().getProperty("ProductID");
+					sPath = oProduct.getBindingContext().getPath();
+					this.getModel().remove(sPath, {
+						success : this._handleUnlistActionResult.bind(this, oProductId, true, i+1, aSelectedProducts.length),
+						error : this._handleUnlistActionResult.bind(this, oProductId, false, i+1, aSelectedProducts.length)
+					});
+				}
+			} else {
+				this._showErrorMessage(this.getModel("i18n").getResourceBundle().getText("TableSelectProduct"));
+			}
+		},
+		onUpdateStockObjects: function() {
+			var aSelectedProducts, i, sPath, oProductObject;
+
+			aSelectedProducts = this.byId("table").getSelectedItems();
+			if (aSelectedProducts.length) {
+				for (i = 0; i < aSelectedProducts.length; i++) {
+					sPath = aSelectedProducts[i].getBindingContext().getPath();
+					oProductObject = aSelectedProducts[i].getBindingContext().getObject();
+					oProductObject.UnitsInStock += 10;
+					this.getModel().update(sPath, oProductObject, {
+						success : this._handleReorderActionResult.bind(this, oProductObject.ProductID, true, i+1, aSelectedProducts.length),
+						error : this._handleReorderActionResult.bind(this, oProductObject.ProductID, false, i+1, aSelectedProducts.length)
+					});
+				}
+			} else {
+				this._showErrorMessage(this.getModel("i18n").getResourceBundle().getText("TableSelectProduct"));
+			}
+		}                
+
 
     });
 
